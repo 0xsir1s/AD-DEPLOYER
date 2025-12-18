@@ -1,0 +1,196 @@
+---
+# =============================================================================
+# Playbook: 06-hardening-anssi.yml
+# Description: Durcissement Active Directory selon les recommandations ANSSI
+# Basé sur le guide PA-099 de l'ANSSI
+# Référence: https://cyber.gouv.fr/publications/recommandations-pour-ladministration-securisee-des-si-reposant-sur-ad
+# =============================================================================
+
+- name: Durcissement Active Directory - Recommandations ANSSI
+  hosts: domain_controllers
+  gather_facts: yes
+  
+  vars:
+    domain_dn: "DC={{ ad_domain.name.split('.')[0] }},DC={{ ad_domain.name.split('.')[1] }}"
+    hardening: "{{ hardening_level | default('anssi') }}"
+    
+  tasks:
+
+    
+    - name: "[ANSSI R1-R5] Configuration de la politique de mots de passe"
+      ansible.windows.win_shell: |
+        Import-Module ActiveDirectory
+        Set-ADDefaultDomainPasswordPolicy -Identity "{{ ad_domain.name }}" `
+          -MinPasswordLength {{ password_policy.min_length }} `
+          -PasswordHistoryCount {{ password_policy.history_count }} `
+          -MaxPasswordAge "{{ password_policy.max_age_days }}.00:00:00" `
+          -MinPasswordAge "{{ password_policy.min_age_days }}.00:00:00" `
+          -ComplexityEnabled $true `
+          -LockoutThreshold {{ password_policy.lockout_threshold }} `
+          -LockoutDuration "00:{{ password_policy.lockout_duration_minutes }}:00" `
+          -ReversibleEncryptionEnabled $false
+        Write-Output "Politique configurée"
+      register: password_policy_result
+
+    
+    - name: "[ANSSI R6] Désactivation du stockage LM Hash"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: NoLMHash
+        data: 1
+        type: dword
+        
+    - name: "[ANSSI R7] Niveau d'authentification LAN Manager (NTLMv2 only)"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: LmCompatibilityLevel
+        data: 5
+        type: dword
+      when: hardening in ['anssi', 'paranoid']
+        
+    - name: "[ANSSI R9] Restriction énumération anonyme SAM"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: RestrictAnonymousSAM
+        data: 1
+        type: dword
+        
+    - name: "[ANSSI R10] Restriction énumération anonyme"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: RestrictAnonymous
+        data: 1
+        type: dword
+    
+    - name: "[ANSSI R16] Signature SMB serveur obligatoire"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters
+        name: RequireSecuritySignature
+        data: 1
+        type: dword
+      when: anssi_security.smb_signing_required | default(true)
+        
+    - name: "[ANSSI R17] Signature SMB client obligatoire"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters
+        name: RequireSecuritySignature
+        data: 1
+        type: dword
+      when: anssi_security.smb_signing_required | default(true)
+        
+    - name: "[ANSSI R18] Désactivation de SMBv1"
+      ansible.windows.win_optional_feature:
+        name: SMB1Protocol
+        state: absent
+      when: hardening in ['standard', 'anssi', 'paranoid']
+      
+    - name: "[ANSSI R19] Signature LDAP serveur"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Services\NTDS\Parameters
+        name: LDAPServerIntegrity
+        data: 2
+        type: dword
+      when: anssi_security.ldap_signing_required | default(true)
+        
+    
+    - name: "[ANSSI R21] Protection LSASS - RunAsPPL"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\Lsa
+        name: RunAsPPL
+        data: 1
+        type: dword
+      when: anssi_security.lsass_protection_enabled | default(true)
+      
+    - name: "[ANSSI R22] Désactivation de WDigest"
+      ansible.windows.win_regedit:
+        path: HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest
+        name: UseLogonCredential
+        data: 0
+        type: dword
+        
+    - name: "[ANSSI R23] Limitation du cache credentials"
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon
+        name: CachedLogonsCount
+        data: "2"
+        type: string
+    
+    - name: "[ANSSI R41-R50] Configuration audit avancé"
+      ansible.windows.win_shell: |
+        # Audit des authentifications
+        auditpol /set /subcategory:"Credential Validation" /success:enable /failure:enable
+        auditpol /set /subcategory:"Kerberos Authentication Service" /success:enable /failure:enable
+        auditpol /set /subcategory:"Kerberos Service Ticket Operations" /success:enable /failure:enable
+        # Audit de la gestion des comptes
+        auditpol /set /subcategory:"Computer Account Management" /success:enable /failure:enable
+        auditpol /set /subcategory:"Security Group Management" /success:enable /failure:enable
+        auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable
+        # Audit des accès
+        auditpol /set /subcategory:"Directory Service Changes" /success:enable /failure:enable
+        auditpol /set /subcategory:"Logon" /success:enable /failure:enable
+        auditpol /set /subcategory:"Logoff" /success:enable
+        auditpol /set /subcategory:"Special Logon" /success:enable
+        auditpol /set /subcategory:"Account Lockout" /success:enable /failure:enable
+        # Audit système
+        auditpol /set /subcategory:"Audit Policy Change" /success:enable /failure:enable
+        auditpol /set /subcategory:"Sensitive Privilege Use" /success:enable /failure:enable
+        auditpol /set /subcategory:"System Integrity" /success:enable /failure:enable
+        Write-Output "Audit avancé configuré"
+      register: audit_config
+      
+    - name: "[ANSSI R46] Taille des journaux d'événements"
+      ansible.windows.win_shell: |
+        wevtutil sl Security /ms:1073741824
+        wevtutil sl System /ms:134217728
+        wevtutil sl Application /ms:134217728
+        Write-Output "Taille journaux configurée"
+    
+    - name: "[ANSSI R66] Désactivation Print Spooler sur DC"
+      ansible.windows.win_service:
+        name: Spooler
+        state: stopped
+        start_mode: disabled
+      when: hardening in ['standard', 'anssi', 'paranoid']
+    
+    - name: "[ANSSI R76] Activation pare-feu tous profils"
+      community.windows.win_firewall:
+        state: enabled
+        profiles:
+          - Domain
+          - Private
+          - Public
+    
+    - name: Génération rapport de durcissement
+      ansible.windows.win_shell: |
+        @{
+          Date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          Niveau = "{{ hardening }}"
+          Politique = @{
+            MinLength = (Get-ADDefaultDomainPasswordPolicy).MinPasswordLength
+            Complexity = (Get-ADDefaultDomainPasswordPolicy).ComplexityEnabled
+          }
+          LSA = @{
+            NoLMHash = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name NoLMHash -EA SilentlyContinue).NoLMHash
+            RunAsPPL = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name RunAsPPL -EA SilentlyContinue).RunAsPPL
+          }
+        } | ConvertTo-Json -Depth 3
+      register: report
+      changed_when: false
+      
+    - name: Résumé
+      ansible.builtin.debug:
+        msg: |
+          ╔════════════════════════════════════════════════════════════════╗
+          ║     DURCISSEMENT ANSSI APPLIQUÉ - NIVEAU {{ hardening | upper }}
+          ╠════════════════════════════════════════════════════════════════╣
+          ║ ✓ Politique mots de passe renforcée                            ║
+          ║ ✓ Protocoles obsolètes désactivés (LM, NTLMv1)                 ║
+          ║ ✓ Signature SMB/LDAP activée                                   ║
+          ║ ✓ Protection LSASS (RunAsPPL)                                  ║
+          ║ ✓ WDigest désactivé                                            ║
+          ║ ✓ Audit avancé configuré                                       ║
+          ║ ✓ Services inutiles désactivés                                 ║
+          ║ ✓ Pare-feu activé                                              ║
+          ║                                                                ║
+          ║ Référence: Guide ANSSI PA-099                                  ║
+          ╚════════════════════════════════════════════════════════════════╝

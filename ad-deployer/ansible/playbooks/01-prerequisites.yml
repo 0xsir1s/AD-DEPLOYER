@@ -1,0 +1,112 @@
+---
+# =============================================================================
+# Playbook: 01-prerequisites.yml
+# Description: Installation des prérequis Windows pour Active Directory
+# =============================================================================
+
+- name: Installation des prérequis Active Directory
+  hosts: domain_controllers
+  gather_facts: yes
+  
+  tasks:
+    
+    - name: Récupération des informations système
+      ansible.windows.win_shell: |
+        @{
+          Hostname = $env:COMPUTERNAME
+          OSVersion = (Get-WmiObject Win32_OperatingSystem).Caption
+          Domain = (Get-WmiObject Win32_ComputerSystem).Domain
+          RAM_GB = [math]::Round((Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 2)
+        } | ConvertTo-Json
+      register: system_info
+      changed_when: false
+      
+    - name: Affichage des informations système
+      ansible.builtin.debug:
+        msg: "{{ system_info.stdout | from_json }}
+    
+    - name: Configuration du DNS primaire vers localhost (futur DC)
+      ansible.windows.win_dns_client:
+        adapter_names: '*'
+        dns_servers:
+          - 127.0.0.1
+          - 8.8.8.8
+    
+    - name: Installation du rôle AD-Domain-Services
+      ansible.windows.win_feature:
+        name: AD-Domain-Services
+        state: present
+        include_management_tools: yes
+      register: ad_feature
+      
+    - name: Installation du rôle DNS
+      ansible.windows.win_feature:
+        name: DNS
+        state: present
+        include_management_tools: yes
+      register: dns_feature
+      
+    - name: Installation des outils RSAT
+      ansible.windows.win_feature:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - RSAT-AD-Tools
+        - RSAT-AD-PowerShell
+        - RSAT-ADDS
+        - RSAT-DNS-Server
+        - GPMC
+      register: rsat_features
+    
+    - name: Installation du provider NuGet
+      ansible.windows.win_shell: |
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+      args:
+        creates: "C:\\Program Files\\PackageManagement\\ProviderAssemblies\\nuget"
+        
+    - name: Configuration de PSGallery comme source de confiance
+      ansible.windows.win_shell: |
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+      changed_when: false
+    
+    - name: Ouverture des ports AD dans le pare-feu
+      community.windows.win_firewall_rule:
+        name: "{{ item.name }}"
+        localport: "{{ item.port }}"
+        protocol: "{{ item.protocol }}"
+        direction: in
+        action: allow
+        state: present
+        enabled: yes
+      loop:
+        - { name: "AD-DNS-TCP", port: "53", protocol: "tcp" }
+        - { name: "AD-DNS-UDP", port: "53", protocol: "udp" }
+        - { name: "AD-Kerberos-TCP", port: "88", protocol: "tcp" }
+        - { name: "AD-Kerberos-UDP", port: "88", protocol: "udp" }
+        - { name: "AD-LDAP-TCP", port: "389", protocol: "tcp" }
+        - { name: "AD-LDAP-UDP", port: "389", protocol: "udp" }
+        - { name: "AD-LDAPS", port: "636", protocol: "tcp" }
+        - { name: "AD-GC", port: "3268", protocol: "tcp" }
+        - { name: "AD-GC-SSL", port: "3269", protocol: "tcp" }
+        - { name: "AD-RPC", port: "135", protocol: "tcp" }
+        - { name: "AD-NetBIOS-Name", port: "137", protocol: "udp" }
+        - { name: "AD-NetBIOS-Datagram", port: "138", protocol: "udp" }
+        - { name: "AD-NetBIOS-Session", port: "139", protocol: "tcp" }
+        - { name: "AD-SMB", port: "445", protocol: "tcp" }
+        - { name: "AD-Kerberos-Change", port: "464", protocol: "tcp" }
+        - { name: "AD-Kerberos-Change-UDP", port: "464", protocol: "udp" }
+    
+    - name: Vérification si un redémarrage est nécessaire
+      ansible.windows.win_reboot:
+        reboot_timeout: 600
+        msg: "Redémarrage pour finaliser l'installation des rôles AD"
+      when: ad_feature.reboot_required or dns_feature.reboot_required
+      
+    - name: Prérequis installés avec succès
+      ansible.builtin.debug:
+        msg: |
+          ✓ Rôle AD-Domain-Services installé
+          ✓ Rôle DNS installé
+          ✓ Outils RSAT installés
+          ✓ Pare-feu configuré
+          Le serveur est prêt pour la promotion en contrôleur de domaine.

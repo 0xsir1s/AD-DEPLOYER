@@ -1,0 +1,163 @@
+---
+# =============================================================================
+# Playbook: 02-create-domain.yml
+# Description: Création du domaine Active Directory et de la forêt
+# =============================================================================
+
+- name: Création du domaine Active Directory
+  hosts: domain_controllers
+  gather_facts: yes
+  
+  vars:
+    # group_vars/all.yml
+    domain_name: "{{ ad_domain.name }}"
+    netbios_name: "{{ ad_domain.netbios }}"
+    safe_mode_password: "{{ ad_domain.safe_mode_password }}"
+    forest_mode: "{{ ad_domain.forest_mode | default('WinThreshold') }}"
+    domain_mode: "{{ ad_domain.domain_mode | default('WinThreshold') }}"
+    
+  tasks:
+
+    
+    - name: Vérification si le serveur est déjà un DC
+      ansible.windows.win_shell: |
+        try {
+          $domain = Get-ADDomain -ErrorAction Stop
+          @{
+            IsDC = $true
+            DomainName = $domain.DNSRoot
+            ForestName = $domain.Forest
+          } | ConvertTo-Json
+        } catch {
+          @{
+            IsDC = $false
+            Error = $_.Exception.Message
+          } | ConvertTo-Json
+        }
+      register: dc_check
+      changed_when: false
+      failed_when: false
+      
+    - name: Analyse du résultat
+      ansible.builtin.set_fact:
+        is_already_dc: "{{ (dc_check.stdout | from_json).IsDC | default(false) }}"
+        
+    - name: Information sur l'état du DC
+      ansible.builtin.debug:
+        msg: "Le serveur est {{ 'déjà' if is_already_dc else 'pas encore' }} un contrôleur de domaine"
+    
+    - name: Création de la nouvelle forêt Active Directory
+      microsoft.ad.domain:
+        dns_domain_name: "{{ domain_name }}"
+        domain_netbios_name: "{{ netbios_name }}"
+        safe_mode_password: "{{ safe_mode_password }}"
+        forest_mode: "{{ forest_mode }}"
+        domain_mode: "{{ domain_mode }}"
+        database_path: "C:\\Windows\\NTDS"
+        sysvol_path: "C:\\Windows\\SYSVOL"
+        log_path: "C:\\Windows\\NTDS"
+        install_dns: true
+        create_dns_delegation: false
+        reboot: true
+      register: domain_creation
+      when: not is_already_dc
+      
+    
+    - name: Attente de la disponibilité du serveur après promotion
+      ansible.windows.win_wait_for:
+        port: 5985
+        delay: 30
+        timeout: 600
+      when: domain_creation.changed | default(false)
+      delegate_to: localhost
+      vars:
+        ansible_connection: local
+        
+    - name: Attente supplémentaire pour la stabilisation des services AD
+      ansible.windows.win_shell: |
+        Start-Sleep -Seconds 60
+      when: domain_creation.changed | default(false)
+    
+    - name: Configuration des redirecteurs DNS
+      ansible.windows.win_shell: |
+        Set-DnsServerForwarder -IPAddress @("8.8.8.8", "8.8.4.4", "1.1.1.1") -PassThru
+      register: dns_forwarders
+      changed_when: "'IPAddress' in dns_forwarders.stdout"
+      
+    - name: Création de la zone de recherche inversée
+      ansible.windows.win_shell: |
+        $networkId = "{{ ansible_host.split('.')[0:3] | join('.') }}"
+        $zoneName = "{{ ansible_host.split('.')[2] }}.{{ ansible_host.split('.')[1] }}.{{ ansible_host.split('.')[0] }}.in-addr.arpa"
+        
+        if (-not (Get-DnsServerZone -Name $zoneName -ErrorAction SilentlyContinue)) {
+          Add-DnsServerPrimaryZone -NetworkId "$networkId.0/24" -ReplicationScope "Forest"
+          Write-Output "Zone créée: $zoneName"
+        } else {
+          Write-Output "Zone existante: $zoneName"
+        }
+      register: reverse_zone
+      changed_when: "'Zone créée' in reverse_zone.stdout"
+    
+    - name: Vérification de la création du domaine
+      ansible.windows.win_shell: |
+        $domain = Get-ADDomain
+        $forest = Get-ADForest
+        $dc = Get-ADDomainController
+        
+        @{
+          DomainName = $domain.DNSRoot
+          NetBIOSName = $domain.NetBIOSName
+          ForestName = $forest.Name
+          ForestMode = $forest.ForestMode.ToString()
+          DomainMode = $domain.DomainMode.ToString()
+          DomainController = $dc.HostName
+          Sites = $forest.Sites
+          GlobalCatalogs = $forest.GlobalCatalogs
+        } | ConvertTo-Json -Depth 3
+      register: domain_info
+      changed_when: false
+      
+    - name: Affichage des informations du domaine
+      ansible.builtin.debug:
+        msg: "{{ domain_info.stdout | from_json }}"
+    
+    - name: Activation de la corbeille Active Directory
+      ansible.windows.win_shell: |
+        $forest = Get-ADForest
+        if ($forest.RecycleBinEnabled -eq $false) {
+          Enable-ADOptionalFeature -Identity 'Recycle Bin Feature' `
+            -Scope ForestOrConfigurationSet `
+            -Target $forest.Name `
+            -Confirm:$false
+          Write-Output "Corbeille AD activée"
+        } else {
+          Write-Output "Corbeille AD déjà activée"
+        }
+      register: recycle_bin
+      changed_when: "'Corbeille AD activée' in recycle_bin.stdout
+    
+    - name: Renommage du site par défaut
+      ansible.windows.win_shell: |
+        $site = Get-ADReplicationSite -Filter 'Name -eq "Default-First-Site-Name"' -ErrorAction SilentlyContinue
+        if ($site) {
+          Rename-ADObject -Identity $site.DistinguishedName -NewName "Site-Principal"
+          Write-Output "Site renommé"
+        } else {
+          Write-Output "Site déjà renommé ou inexistant"
+        }
+      register: site_rename
+      changed_when: "'Site renommé' in site_rename.stdout"
+      failed_when: false
+      
+    - name: Résumé de la création du domaine
+      ansible.builtin.debug:
+        msg: |
+          ╔════════════════════════════════════════════════════════════════╗
+          ║            DOMAINE ACTIVE DIRECTORY CRÉÉ AVEC SUCCÈS           ║
+          ╠════════════════════════════════════════════════════════════════╣
+          ║ Domaine DNS    : {{ domain_name }}
+          ║ NetBIOS        : {{ netbios_name }}
+          ║ Mode Forêt     : {{ forest_mode }}
+          ║ Mode Domaine   : {{ domain_mode }}
+          ║ Corbeille AD   : Activée
+          ╚════════════════════════════════════════════════════════════════╝

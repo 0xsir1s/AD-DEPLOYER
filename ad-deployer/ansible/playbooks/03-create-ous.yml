@@ -1,0 +1,169 @@
+---
+# =============================================================================
+# Playbook: 03-create-ous.yml
+# Description: Création de la structure d'Unités Organisationnelles (OUs)
+# Selon le modèle de Tiering ANSSI
+# =============================================================================
+
+- name: Création des Unités Organisationnelles
+  hosts: domain_controllers
+  gather_facts: no
+  
+  vars:
+    domain_dn: "DC={{ ad_domain.name.split('.')[0] }},DC={{ ad_domain.name.split('.')[1] }}"
+    
+  tasks:
+    
+    - name: Création de l'OU racine Administration
+      microsoft.ad.ou:
+        name: "Admin"
+        path: "{{ domain_dn }}"
+        state: present
+        description: "OU racine pour l'administration - Modèle Tiering ANSSI"
+        protect: true
+      register: ou_admin
+      
+    - name: Création des OUs Tier 0, 1, 2
+      microsoft.ad.ou:
+        name: "{{ item.name }}"
+        path: "OU=Admin,{{ domain_dn }}"
+        state: present
+        description: "{{ item.description }}"
+        protect: true
+      loop:
+        - name: "Tier0"
+          description: "Tier 0 - Administration des contrôleurs de domaine et AD"
+        - name: "Tier1"
+          description: "Tier 1 - Administration des serveurs membres"
+        - name: "Tier2"
+          description: "Tier 2 - Administration des postes de travail"
+      register: ou_tiers
+
+    - name: Création des sous-OUs pour Tier 0
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "OU=Tier0,OU=Admin,{{ domain_dn }}"
+        state: present
+        protect: true
+      loop:
+        - "Comptes"
+        - "Groupes"
+        - "PAW"
+      
+    - name: Création des sous-OUs pour Tier 1
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "OU=Tier1,OU=Admin,{{ domain_dn }}"
+        state: present
+        protect: true
+      loop:
+        - "Comptes"
+        - "Groupes"
+        - "Serveurs"
+        
+    - name: Création des sous-OUs pour Tier 2
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "OU=Tier2,OU=Admin,{{ domain_dn }}"
+        state: present
+        protect: true
+      loop:
+        - "Comptes"
+        - "Groupes"
+        - "Postes"
+    
+    - name: Création des OUs principales
+      microsoft.ad.ou:
+        name: "{{ item.name }}"
+        path: "{{ domain_dn }}"
+        state: present
+        description: "{{ item.description }}"
+        protect: true
+      loop:
+        - name: "Utilisateurs"
+          description: "Comptes utilisateurs standards"
+        - name: "Groupes"
+          description: "Groupes de sécurité et de distribution"
+        - name: "Serveurs"
+          description: "Serveurs membres du domaine"
+        - name: "Postes"
+          description: "Postes de travail"
+        - name: "Comptes-Service"
+          description: "Comptes de service (MSA, gMSA)"
+        - name: "Quarantaine"
+          description: "Objets en attente de traitement"
+    
+    - name: Création des sous-OUs utilisateurs par département
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "OU=Utilisateurs,{{ domain_dn }}"
+        state: present
+        protect: false
+      loop:
+        - "Direction"
+        - "IT"
+        - "RH"
+        - "Finance"
+        - "Commercial"
+        - "Production"
+        - "Externes"
+        
+    
+    - name: Création des sous-OUs pour les postes
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "OU=Postes,{{ domain_dn }}"
+        state: present
+        protect: false
+      loop:
+        - "Fixes"
+        - "Portables"
+        - "VDI"
+    
+    - name: Création des sous-OUs pour les serveurs
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "OU=Serveurs,{{ domain_dn }}"
+        state: present
+        protect: false
+      loop:
+        - "Production"
+        - "Developpement"
+        - "Test"
+        - "DMZ"
+
+    
+    - name: Récupération de la structure des OUs
+      ansible.windows.win_shell: |
+        Get-ADOrganizationalUnit -Filter * -Properties Description | 
+          Select-Object Name, Description, DistinguishedName |
+          Sort-Object DistinguishedName |
+          ConvertTo-Json -Depth 3
+      register: ou_structure
+      changed_when: false
+      
+    - name: Affichage de la structure des OUs
+      ansible.builtin.debug:
+        msg: |
+          Structure des Unités Organisationnelles créée:
+          {{ ou_structure.stdout | from_json | to_nice_yaml }}
+          
+    - name: Résumé
+      ansible.builtin.debug:
+        msg: |
+          ╔════════════════════════════════════════════════════════════════╗
+          ║          STRUCTURE DES OUs CRÉÉE AVEC SUCCÈS                   ║
+          ╠════════════════════════════════════════════════════════════════╣
+          ║ Modèle de Tiering ANSSI appliqué:                              ║
+          ║  • Tier 0: Contrôleurs de domaine / AD                         ║
+          ║  • Tier 1: Serveurs membres                                    ║
+          ║  • Tier 2: Postes de travail                                   ║
+          ║                                                                ║
+          ║ OUs métier créées:                                             ║
+          ║  • Utilisateurs (avec départements)                            ║
+          ║  • Groupes                                                     ║
+          ║  • Serveurs (Production, Dev, Test, DMZ)                       ║
+          ║  • Postes (Fixes, Portables, VDI)                              ║
+          ║  • Comptes-Service                                             ║
+          ║  • Quarantaine                                                 ║
+          ╚════════════════════════════════════════════════════════════════╝
