@@ -1,6 +1,6 @@
 # AD-Deployer
 
-**Déploiement et durcissement automatisé d'Active Directory conforme aux recommandations ANSSI.**
+**Déploiement et durcissement automatisé d'Active Directory.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ansible](https://img.shields.io/badge/Ansible-2.14+-red.svg)](https://www.ansible.com/)
