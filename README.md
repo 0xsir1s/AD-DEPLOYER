@@ -1,4 +1,4 @@
-# AD-Deployer 🛡️
+# AD-Deployer
 
 **Déploiement et durcissement automatisé d'Active Directory conforme aux recommandations ANSSI.**
 
