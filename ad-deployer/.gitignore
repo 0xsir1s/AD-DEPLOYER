@@ -1,1 +1,45 @@
+# Logs
+logs/*.log
+*.log
 
+# Fichiers sensibles
+*.key
+*.pem
+*.pfx
+secrets/
+credentials/
+
+# Variables d'environnement
+.env
+.env.local
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*.swp
+*~
+
+# Ansible
+*.retry
+.ansible/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Test
+test_outputs/
+.vagrant/
