@@ -547,15 +547,6 @@ grep -i "failed\|error" logs/*.log
 - [DCDiag Reference](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc731968(v=ws.11))
 - [Repadmin Reference](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc770963(v=ws.11))
 
-### Communauté
-- [r/sysadmin](https://reddit.com/r/sysadmin)
-- [Stack Overflow - Active Directory](https://stackoverflow.com/questions/tagged/active-directory)
-- [Spiceworks Community](https://community.spiceworks.com/)
-
 ---
 
-**Toujours pas résolu ?** Ouvre une issue sur GitHub avec :
-1. La commande exacte exécutée
-2. Le message d'erreur complet
-3. Les logs pertinents
-4. Ta configuration (OS, RAM, réseau)
+
