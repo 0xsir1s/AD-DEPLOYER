@@ -8,7 +8,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # 1. Cloner le projet
@@ -22,11 +22,11 @@ chmod +x deploy-ad.sh
 ./deploy-ad.sh -t 192.168.1.10 -p 'AdminP@ss!' -s 'DsrmP@ss123!' -d lab.local -n LAB
 ```
 
-✅ **Active Directory déployé et durci en ~15 minutes !**
+**Active Directory déployé et durci en ~15 minutes !**
 
 ---
 
-## 📋 Description
+## Description
 
 AD-Deployer automatise le déploiement et la sécurisation d'environnements Active Directory selon le modèle de **Tiering ANSSI** (Administration en Tiers).
 
@@ -43,7 +43,7 @@ AD-Deployer automatise le déploiement et la sécurisation d'environnements Acti
 
 ---
 
-## 🏗️ Architecture Tiering ANSSI
+## Architecture Tiering ANSSI
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -63,7 +63,7 @@ AD-Deployer automatise le déploiement et la sécurisation d'environnements Acti
 
 ---
 
-## 🔧 Prérequis
+## Prérequis
 
 ### Sur la machine de contrôle (Linux/WSL)
 
@@ -98,7 +98,7 @@ New-NetFirewallRule -Name "WinRM-HTTP" -DisplayName "WinRM HTTP" -Protocol TCP -
 
 ---
 
-## 📖 Utilisation
+## Utilisation
 
 ### Syntaxe
 
@@ -139,7 +139,7 @@ New-NetFirewallRule -Name "WinRM-HTTP" -DisplayName "WinRM HTTP" -Protocol TCP -
 
 ---
 
-## 💡 Exemples
+## Exemples
 
 ### Déploiement minimal (lab/test)
 
@@ -201,7 +201,7 @@ New-NetFirewallRule -Name "WinRM-HTTP" -DisplayName "WinRM HTTP" -Protocol TCP -
 
 ---
 
-## 🔒 Niveaux de durcissement
+## Niveaux de durcissement
 
 | Mesure | `minimal` | `standard` | `anssi` | `paranoid` |
 |--------|:---------:|:----------:|:-------:|:----------:|
@@ -213,11 +213,11 @@ New-NetFirewallRule -Name "WinRM-HTTP" -DisplayName "WinRM HTTP" -Protocol TCP -
 | **Protection LSASS** | ❌ | ✅ | ✅ | ✅ |
 | **Signature LDAP** | ❌ | ✅ | ✅ | ✅ |
 
-> 💡 **Recommandation :** Utilisez `anssi` pour la production, `minimal` uniquement pour les labs.
+> **Recommandation :** Utilisez `anssi` pour la production, `minimal` uniquement pour les labs.
 
 ---
 
-## 📁 Structure du projet
+## Structure du projet
 
 ```
 AD-DEPLOYER/
@@ -240,26 +240,26 @@ AD-DEPLOYER/
 
 ---
 
-## 🔐 Conformité ANSSI
+## Conformité ANSSI
 
 Ce projet implémente les recommandations de :
 
-- 📘 **[Guide ANSSI PA-099](https://cyber.gouv.fr/publications/recommandations-pour-ladministration-securisee-des-si-reposant-sur-ad)** - Administration sécurisée des SI reposant sur AD
-- 📗 **[Points de contrôle AD (CERT-FR)](https://www.cert.ssi.gouv.fr/dur/CERTFR-2020-DUR-001/)** - Durcissement Active Directory
+- **[Guide ANSSI PA-099](https://cyber.gouv.fr/publications/recommandations-pour-ladministration-securisee-des-si-reposant-sur-ad)** - Administration sécurisée des SI reposant sur AD
+- **[Points de contrôle AD (CERT-FR)](https://www.cert.ssi.gouv.fr/dur/CERTFR-2020-DUR-001/)** - Durcissement Active Directory
 
 ### Mesures appliquées
 
-- 🔐 Politique de mots de passe renforcée (longueur, complexité, historique)
-- 🚫 Désactivation des protocoles obsolètes (LM, NTLMv1, SMBv1)
-- 🛡️ Isolation des comptes à privilèges (Tiering)
-- 📊 Audit et logging renforcés
-- 🔒 Protection des credentials (LSASS RunAsPPL)
-- ✍️ Signature obligatoire (SMB, LDAP)
-- 🖨️ Désactivation Print Spooler sur DC
+- Politique de mots de passe renforcée (longueur, complexité, historique)
+- Désactivation des protocoles obsolètes (LM, NTLMv1, SMBv1)
+- Isolation des comptes à privilèges (Tiering)
+- Audit et logging renforcés
+- Protection des credentials (LSASS RunAsPPL)
+- Signature obligatoire (SMB, LDAP)
+- Désactivation Print Spooler sur DC
 
 ---
 
-## 📊 Logs
+## Logs
 
 Les logs sont générés dans `logs/` avec horodatage :
 
@@ -269,7 +269,7 @@ logs/deploy-ad_2024-12-19_14-30-25.log
 
 ---
 
-## 🐛 Dépannage
+## Dépannage
 
 ### Erreur "WinRM non accessible"
 
@@ -310,17 +310,17 @@ ansible-playbook --syntax-check ansible/playbooks/*.yml
 
 ---
 
-## 🧪 Environnements testés
+## Environnements testés
 
 | OS | Hyperviseur | Statut |
 |----|-------------|--------|
-| Windows Server 2022 | Vagrant/VMware | ✅ |
-| Windows Server 2019 | Hyper-V | ✅ |
-| Windows Server 2019 | VirtualBox | ✅ |
+| Windows Server 2022 | Vagrant/VMware |
+| Windows Server 2019 | Hyper-V |
+| Windows Server 2019 | VirtualBox |
 
 ---
 
-## 📜 Licence
+## Licence
 
 Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
