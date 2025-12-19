@@ -1059,6 +1059,11 @@ parse_arguments() {
 main() {
     # Affichage de la bannière
     show_banner
+    # Création du fichier de log
+    mkdir -p "${LOGS_DIR}"
+    LOG_FILE="${LOGS_DIR}/deploy-ad_$(date '+%Y-%m-%d_%H-%M-%S').log"
+    exec > >(tee -a "${LOG_FILE}") 2>&1
+    log_info "Logs enregistrés dans: ${LOG_FILE}"
     
     # Parsing des arguments de ligne de commande
     parse_arguments "$@"
