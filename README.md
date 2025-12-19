@@ -269,8 +269,8 @@ logs/deploy-ad_2024-12-19_14-30-25.log
 
 ## Environnements testés
 
-| OS | Hyperviseur | Statut |
-|----|-------------|--------|
+| OS | Hyperviseur |
+|----|-------------|
 | Windows Server 2022 | Vagrant/VMware |
 | Windows Server 2019 | Hyper-V |
 | Windows Server 2019 | VirtualBox |
