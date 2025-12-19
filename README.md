@@ -1,340 +1,184 @@
-# 🛡️ AD-Deployer - Active Directory Deployment & Hardening Tool
+# AD-Deployer 🛡️
 
-[![Bash](https://img.shields.io/badge/Bash-5.0+-green.svg)](https://www.gnu.org/software/bash/)
-[![Ansible](https://img.shields.io/badge/Ansible-2.14+-red.svg)](https://www.ansible.com/)
-[![ANSSI](https://img.shields.io/badge/ANSSI-PA--099-blue.svg)](https://cyber.gouv.fr/publications/recommandations-pour-ladministration-securisee-des-si-reposant-sur-ad)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Déploiement et durcissement automatisé d'Active Directory conforme aux recommandations ANSSI.
 
-> 🇫🇷 Script Bash orchestrant Ansible pour le déploiement automatisé d'Active Directory avec durcissement selon les recommandations ANSSI.
-
-![AD-Deployer Banner](docs/banner.png)
-
-## 📋 Table des matières
-
-- [Présentation](#-présentation)
-- [Fonctionnalités](#-fonctionnalités)
-- [Prérequis](#-prérequis)
-- [Installation](#-installation)
-- [Utilisation](#-utilisation)
-- [Architecture](#-architecture)
-- [Niveaux de durcissement](#-niveaux-de-durcissement)
-- [Recommandations ANSSI](#-recommandations-anssi-implémentées)
-- [Exemples](#-exemples)
-- [Contribution](#-contribution)
-- [Auteur](#-auteur)
-- [Références](#-références)
-
-## 🎯 Présentation
-
-**AD-Deployer** est un outil d'automatisation qui simplifie le déploiement d'environnements Active Directory sécurisés. Il combine la puissance de **Bash** pour l'orchestration et **Ansible** pour la configuration, tout en appliquant les **recommandations de sécurité de l'ANSSI** (guide PA-099).
-
-### Pourquoi cet outil ?
-
-- ⏱️ **Gain de temps** : Déploiement complet en quelques minutes
-- 🔒 **Sécurité by design** : Durcissement ANSSI intégré dès le départ
-- 📚 **Best practices** : Implémentation du modèle de Tiering
-- 🔄 **Reproductible** : Infrastructure as Code
-- 📝 **Documenté** : Code commenté et documentation complète
-
-## ✨ Fonctionnalités
-
-### Déploiement Active Directory
-- ✅ Création de forêt et domaine AD
-- ✅ Configuration DNS intégrée
-- ✅ Activation de la corbeille AD
-- ✅ Configuration des sites AD
-
-### Structure organisationnelle
-- ✅ Création automatique des OUs (modèle Tiering)
-- ✅ Groupes de sécurité préconfigurés
-- ✅ Groupes de délégation
-- ✅ Comptes administrateurs par Tier
-
-### Gestion des utilisateurs
-- ✅ Création en masse d'utilisateurs
-- ✅ Attribution automatique aux groupes
-- ✅ Comptes de service (gMSA ready)
-- ✅ Mots de passe conformes aux politiques
-
-### Durcissement ANSSI
-- ✅ Politique de mots de passe renforcée
-- ✅ Désactivation des protocoles obsolètes (LM, NTLMv1)
-- ✅ Signature SMB et LDAP obligatoire
-- ✅ Protection LSASS (RunAsPPL)
-- ✅ Audit avancé configuré
-- ✅ GPOs de sécurité prêtes à l'emploi
-
-### GPOs de sécurité
-- ✅ Restrictions par Tier (Tier 0, 1, 2)
-- ✅ Politique d'audit avancée
-- ✅ Central Store ADMX configuré
-
-## 📦 Prérequis
-
-### Contrôleur Ansible (Linux)
-
+## 🚀 Quick Start
 ```bash
-# Système
-- Ubuntu 20.04+ / Debian 11+ / CentOS 8+
-- Bash 5.0+
-- Python 3.8+
+git clone https://github.com/0xsir1s/AD-DEPLOYER.git
+cd AD-DEPLOYER
+./setup.sh
 
-# Packages
-- ansible >= 2.14
-- python3-pip
-- sshpass (optionnel)
+# Test avec Vagrant (recommandé)
+vagrant up && ./test-vagrant.sh
+
+# Ou sur serveur réel
+./deploy-ad.sh -d lab.local -n LAB -p 'YourPassword!'
 ```
 
-### Serveur cible (Windows)
+✅ **Active Directory déployé en 15 minutes !**
 
+📖 **Guide détaillé** : [QUICKSTART.md](docs/QUICKSTART.md)
+
+---
+
+## 📋 Description
+
+AD-Deployer est un outil d'automatisation pour le déploiement et la sécurisation d'environnements Active Directory selon le modèle de **Tiering ANSSI** (Administration en Tiers).
+
+### Fonctionnalités principales
+
+- ✅ Déploiement complet d'une forêt/domaine AD
+- ✅ Structure OU selon modèle Tiering ANSSI (Tier 0, 1, 2)
+- ✅ Création automatisée de groupes de sécurité
+- ✅ Génération d'utilisateurs de test
+- ✅ Durcissement selon recommandations ANSSI
+- ✅ GPOs de sécurité pré-configurées
+- ✅ Logging détaillé et gestion d'erreurs
+
+## 🏗️ Architecture
 ```
-- Windows Server 2016 / 2019 / 2022
-- PowerShell 5.1+
-- WinRM activé et configuré
-- Connectivité réseau (ports 5985/5986)
+Tier 0 (Critique)     → Contrôleurs de domaine, admins domaine
+Tier 1 (Serveurs)     → Serveurs applicatifs, admins serveurs  
+Tier 2 (Postes)       → Workstations, utilisateurs standards
 ```
 
-### Collections Ansible requises
+## 🔧 Prérequis
 
-```bash
-ansible-galaxy collection install microsoft.ad
-ansible-galaxy collection install community.windows
-ansible-galaxy collection install ansible.windows
-```
+- **OS** : Windows Server 2019/2022
+- **RAM** : 4 GB minimum
+- **Ansible** : Version 2.9+
+- **PowerShell** : Version 5.1+
+- **Compte** : Administrateur local
 
 ## 🚀 Installation
-
-### 1. Cloner le dépôt
-
 ```bash
-git clone https://github.com/DISIZ/ad-deployer.git
-cd ad-deployer
-```
-
-### 2. Installer les dépendances
-
-```bash
-# Sur Ubuntu/Debian
-sudo apt update
-sudo apt install ansible python3-pip sshpass -y
-pip3 install pywinrm
-
-# Collections Ansible
-ansible-galaxy collection install microsoft.ad community.windows ansible.windows
-```
-
-### 3. Rendre le script exécutable
-
-```bash
+git clone https://github.com/0xsir1s/AD-DEPLOYER.git
+cd AD-DEPLOYER
 chmod +x deploy-ad.sh
-```
-
-### 4. Configurer WinRM sur le serveur Windows cible
-
-```powershell
-# Sur le serveur Windows (en tant qu'administrateur)
-winrm quickconfig -q
-winrm set winrm/config/service '@{AllowUnencrypted="true"}'
-winrm set winrm/config/service/auth '@{Basic="true"}'
-Set-Item WSMan:\localhost\Client\TrustedHosts -Value "*" -Force
 ```
 
 ## 📖 Utilisation
 
-### Syntaxe de base
-
+### Déploiement complet
 ```bash
-./deploy-ad.sh -t <IP_CIBLE> -p <MOT_DE_PASSE> -s <SAFE_MODE_PASSWORD> [OPTIONS]
+./deploy-ad.sh --domain lab.local --netbios LAB --password 'P@ssw0rd123!'
 ```
 
-### Options principales
-
-| Option | Description | Défaut |
-|--------|-------------|--------|
-| `-t, --target` | IP du serveur Windows cible | **Requis** |
-| `-p, --password` | Mot de passe administrateur | **Requis** |
-| `-s, --safe-mode` | Mot de passe mode récupération | **Requis** |
-| `-d, --domain` | Nom du domaine AD | `lab.local` |
-| `-n, --netbios` | Nom NetBIOS | Auto-généré |
-| `-u, --users` | Nombre d'utilisateurs à créer | `10` |
-| `-g, --groups` | Groupes personnalisés (CSV) | - |
-| `-H, --hardening` | Niveau de durcissement | `anssi` |
-| `-v, --verbose` | Mode verbeux | Désactivé |
-| `--dry-run` | Simulation sans exécution | Désactivé |
-
-### Exemple rapide
-
+### Options disponibles
 ```bash
-# Déploiement minimal
-./deploy-ad.sh -t 192.168.1.10 -p 'P@ssw0rd!' -s 'S@feM0de!'
-
-# Déploiement complet avec personnalisation
-./deploy-ad.sh \
-  --target 192.168.1.10 \
-  --password 'P@ssw0rd!' \
-  --safe-mode 'S@feM0de!' \
-  --domain "entreprise.local" \
-  --netbios "ENTREPRISE" \
-  --users 50 \
-  --groups "IT,RH,Finance,Direction,Commercial" \
-  --hardening anssi \
-  --verbose
+-d, --domain        Nom FQDN du domaine (ex: lab.local)
+-n, --netbios       Nom NetBIOS (ex: LAB)
+-p, --password      Mot de passe administrateur
+-i, --ip            Adresse IP du DC (optionnel)
+-h, --help          Affiche l'aide
+--skip-hardening    Passe le durcissement ANSSI
+--dry-run           Mode test sans modification
 ```
 
-## 🏗️ Architecture
+### Exemples
+```bash
+# Déploiement avec IP personnalisée
+./deploy-ad.sh -d corp.local -n CORP -p 'SecureP@ss!' -i 192.168.1.10
 
+# Déploiement sans durcissement (test)
+./deploy-ad.sh -d test.local -n TEST -p 'Test123!' --skip-hardening
+```
+
+## 📁 Structure du projet
 ```
 ad-deployer/
-├── deploy-ad.sh                    # Script Bash principal
-├── README.md                       # Documentation
-├── LICENSE                         # Licence MIT
-├── ansible/
-│   ├── inventory/
-│   │   └── hosts.yml              # Inventaire (généré)
-│   ├── group_vars/
-│   │   └── all.yml                # Variables (généré)
-│   ├── playbooks/
-│   │   ├── 01-prerequisites.yml   # Installation rôles Windows
-│   │   ├── 02-create-domain.yml   # Création domaine/forêt
-│   │   ├── 03-create-ous.yml      # Structure OUs Tiering
-│   │   ├── 04-create-groups.yml   # Groupes de sécurité
-│   │   ├── 05-create-users.yml    # Comptes utilisateurs
-│   │   ├── 06-hardening-anssi.yml # Durcissement ANSSI
-│   │   └── 07-create-gpos.yml     # GPOs de sécurité
-│   └── templates/                  # Templates Jinja2
-├── docs/
-│   └── banner.png                 # Image bannière
-├── logs/                          # Logs d'exécution
-└── scripts/                       # Scripts utilitaires
+├── deploy-ad.sh              # Script principal orchestration
+├── ansible/playbooks/        # Playbooks Ansible modulaires
+│   ├── 01-prerequisites.yml
+│   ├── 02-create-domain.yml
+│   ├── 03-create-ous.yml
+│   ├── 04-create-groups.yml
+│   ├── 05-create-users.yml
+│   ├── 06-hardening-anssi.yml
+│   └── 07-create-gpos.yml
+├── docs/                     # Documentation technique
+└── logs/                     # Logs d'exécution
 ```
 
-## 🔐 Niveaux de durcissement
+## 🔒 Conformité ANSSI
 
-| Niveau | Description | Cas d'usage |
-|--------|-------------|-------------|
-| `minimal` | Configuration de base | Lab, tests |
-| `standard` | Bonnes pratiques Microsoft | Environnement interne |
-| `anssi` | **Recommandations ANSSI PA-099** | **Production (recommandé)** |
-| `paranoid` | Sécurité maximale | Environnement critique |
+Ce projet implémente les recommandations de :
+- **Guide ANSSI - Administration Sécurisée des SI** (2015)
+- **Modèle Tiering Microsoft** adapté au contexte français
 
-### Comparatif des mesures
+### Mesures de sécurité appliquées
 
-| Mesure | minimal | standard | anssi | paranoid |
-|--------|:-------:|:--------:|:-----:|:--------:|
-| Longueur MDP minimum | 8 | 12 | 14 | 16 |
-| Historique MDP | 5 | 12 | 24 | 24 |
-| Verrouillage compte | 10 | 5 | 5 | 3 |
-| NTLMv2 uniquement | ❌ | ✅ | ✅ | ✅ |
-| Signature SMB | ❌ | ✅ | ✅ | ✅ |
-| Protection LSASS | ❌ | ✅ | ✅ | ✅ |
-| Credential Guard | ❌ | ❌ | ✅ | ✅ |
+- 🔐 Politique de mots de passe renforcée
+- 🚫 Désactivation des protocoles legacy (SMBv1, NTLM)
+- 🛡️ Isolation des comptes à privilèges
+- 📊 Audit et logging renforcés
+- 🔄 Restriction des droits d'administration
 
-## 📜 Recommandations ANSSI implémentées
+## 📊 Logs et monitoring
 
-Ce script implémente les principales recommandations du guide **ANSSI PA-099** :
-
-### Authentification et mots de passe (R1-R5)
-- ✅ Politique de complexité des mots de passe
-- ✅ Historique et âge des mots de passe
-- ✅ Verrouillage des comptes
-
-### Protocoles (R6-R20)
-- ✅ R6: Désactivation du stockage LM Hash
-- ✅ R7: Configuration LAN Manager (NTLMv2)
-- ✅ R9-R10: Restriction énumération anonyme
-- ✅ R16-R17: Signature SMB obligatoire
-- ✅ R18: Désactivation SMBv1
-- ✅ R19-R20: Signature LDAP
-
-### Protection des credentials (R21-R30)
-- ✅ R21: Protection LSASS (RunAsPPL)
-- ✅ R22: Désactivation WDigest
-- ✅ R23: Limitation du cache credentials
-
-### Audit (R41-R50)
-- ✅ R41-R50: Audit avancé configuré
-- ✅ R46: Taille des journaux augmentée
-
-### Administration (R51-R60)
-- ✅ Modèle de Tiering (Tier 0, 1, 2)
-- ✅ Séparation des comptes d'administration
-- ✅ Groupes Protected Users
-
-## 💡 Exemples
-
-### Déploiement pour un lab de test
-
-```bash
-./deploy-ad.sh \
-  -t 192.168.56.10 \
-  -p 'Test@123!' \
-  -s 'Recovery@123!' \
-  -d "lab.local" \
-  -u 5 \
-  -H minimal \
-  --verbose
+Les logs sont stockés dans `logs/` avec horodatage :
+```
+logs/deploy-ad_2024-12-19_14-30-25.log
 ```
 
-### Déploiement production avec durcissement ANSSI
+## 🧪 Environnement de test
 
-```bash
-./deploy-ad.sh \
-  -t 10.0.0.10 \
-  -p 'Pr0d@SecureP4ss!' \
-  -s 'R3c0very@2025!' \
-  -d "corp.entreprise.fr" \
-  -n "CORP" \
-  -u 100 \
-  -g "IT,RH,Finance,Direction,Commercial,Production,R&D" \
-  -H anssi
-```
-
-### Mode simulation (dry-run)
-
-```bash
-./deploy-ad.sh \
-  -t 192.168.1.10 \
-  -p 'P@ssw0rd!' \
-  -s 'S@feM0de!' \
-  --dry-run \
-  --verbose
-```
+Testé sur :
+- Windows Server 2022 (Vagrant/VMware)
+- Windows Server 2019 (Hyper-V)
+- Domaine : lab.local
 
 ## 🤝 Contribution
 
-Les contributions sont les bienvenues ! N'hésitez pas à :
-
+Les contributions sont les bienvenues ! Merci de :
 1. Fork le projet
-2. Créer une branche feature (`git checkout -b feature/AmazingFeature`)
-3. Commit vos changements (`git commit -m 'Add AmazingFeature'`)
-4. Push la branche (`git push origin feature/AmazingFeature`)
+2. Créer une branche (`git checkout -b feature/amelioration`)
+3. Commit (`git commit -m 'Ajout fonctionnalité'`)
+4. Push (`git push origin feature/amelioration`)
 5. Ouvrir une Pull Request
 
-## 👤 Auteur
+## 📜 Licence
 
-**DISIZ** - Étudiant en Cybersécurité - IPSSI Nice
+MIT License - voir fichier [LICENSE](LICENSE)
 
-- 🔗 GitHub: [@DISIZ](https://github.com/DISIZ)
-- 💼 LinkedIn: [DISIZ](https://linkedin.com/in/DISIZ)
+## ✍️ Auteur
 
-## 📚 Références
+**0xsir1s** - Étudiant cybersécurité IPSSI Nice
+- GitHub : [@0xsir1s](https://github.com/0xsir1s)
+- LinkedIn : [Profil LinkedIn]
+- Portfolio : [En cours]
 
-- [Guide ANSSI PA-099 - Administration sécurisée des SI reposant sur AD](https://cyber.gouv.fr/publications/recommandations-pour-ladministration-securisee-des-si-reposant-sur-ad)
-- [Points de contrôle Active Directory - CERT-FR](https://www.cert.ssi.gouv.fr/dur/CERTFR-2020-DUR-001/)
-- [HardenAD - Projet de durcissement AD](https://github.com/LoicVeirman/HardenAD)
-- [Collection Ansible microsoft.ad](https://docs.ansible.com/ansible/latest/collections/microsoft/ad/)
-- [Microsoft Security Baselines](https://docs.microsoft.com/en-us/windows/security/threat-protection/windows-security-baselines)
+## 🙏 Remerciements
 
-## 📄 Licence
-
-Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
+- ANSSI pour les recommandations de sécurité
+- Communauté Ansible
+- IPSSI Nice
 
 ---
 
-<p align="center">
-  <i>Projet réalisé dans le cadre du cours de Scripting Bash & Automatisation - IPSSI Nice</i>
-</p>
+⭐ **N'hésite pas à star le projet si tu le trouves utile !**
+```
 
-<p align="center">
-  ⭐ Si ce projet vous a aidé, n'hésitez pas à lui donner une étoile !
-</p>
+Et aussi la **LICENSE** corrigée :
+```
+MIT License
+
+Copyright (c) 2024 0xsir1s
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
