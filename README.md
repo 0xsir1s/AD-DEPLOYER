@@ -17,8 +17,6 @@ vagrant up && ./test-vagrant.sh
 
 ✅ **Active Directory déployé en 15 minutes !**
 
-📖 **Guide détaillé** : [QUICKSTART.md](docs/QUICKSTART.md)
-
 ---
 
 ## 📋 Description
