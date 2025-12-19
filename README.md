@@ -22,8 +22,6 @@ chmod +x deploy-ad.sh
 ./deploy-ad.sh -t 192.168.1.10 -p 'AdminP@ss!' -s 'DsrmP@ss123!' -d lab.local -n LAB
 ```
 
-**Active Directory déployé et durci en ~15 minutes !**
-
 ---
 
 ## Description
