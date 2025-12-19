@@ -7,13 +7,12 @@
 - name: Création des GPOs de sécurité
   hosts: domain_controllers
   gather_facts: no
-  
+
   vars:
     domain_dn: "DC={{ ad_domain.name.split('.')[0] }},DC={{ ad_domain.name.split('.')[1] }}"
-    
+
   tasks:
 
-    
     - name: Vérification du module GroupPolicy
       ansible.windows.win_shell: |
         if (Get-Module -ListAvailable -Name GroupPolicy) {
@@ -24,243 +23,177 @@
           Write-Output "Module GroupPolicy installé"
         }
       register: gp_module
-      
-    
+
     - name: Création GPO - Restrictions Tier 0
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-Tier0-Restrictions"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
-          $gpo = New-GPO -Name $gpoName -Comment "Restrictions d'accès pour le Tier 0 - ANSSI"
+          $gpo = New-GPO -Name $gpoName -Comment "Restrictions Tier 0 - ANSSI"
           Write-Output "GPO créée: $gpoName"
         } else {
           Write-Output "GPO existante: $gpoName"
         }
-        
-        # Liaison à l'OU Tier0
         $ouPath = "OU=Tier0,OU=Admin,{{ domain_dn }}"
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target $ouPath -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target $ouPath -LinkEnabled Yes
-          Write-Output "GPO liée à: $ouPath"
+          Write-Output "GPO liée"
         }
       register: gpo_tier0
-      
+
     - name: Création GPO - Restrictions Tier 1
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-Tier1-Restrictions"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
-          $gpo = New-GPO -Name $gpoName -Comment "Restrictions d'accès pour le Tier 1 - ANSSI"
+          $gpo = New-GPO -Name $gpoName -Comment "Restrictions Tier 1 - ANSSI"
           Write-Output "GPO créée: $gpoName"
         } else {
           Write-Output "GPO existante: $gpoName"
         }
-        
         $ouPath = "OU=Tier1,OU=Admin,{{ domain_dn }}"
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target $ouPath -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target $ouPath -LinkEnabled Yes
-          Write-Output "GPO liée à: $ouPath"
+          Write-Output "GPO liée"
         }
       register: gpo_tier1
-      
+
     - name: Création GPO - Restrictions Tier 2
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-Tier2-Restrictions"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
-          $gpo = New-GPO -Name $gpoName -Comment "Restrictions d'accès pour le Tier 2 - ANSSI"
+          $gpo = New-GPO -Name $gpoName -Comment "Restrictions Tier 2 - ANSSI"
           Write-Output "GPO créée: $gpoName"
         } else {
           Write-Output "GPO existante: $gpoName"
         }
-        
         $ouPath = "OU=Tier2,OU=Admin,{{ domain_dn }}"
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target $ouPath -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target $ouPath -LinkEnabled Yes
-          Write-Output "GPO liée à: $ouPath"
+          Write-Output "GPO liée"
         }
       register: gpo_tier2
-    
-    - name: Création GPO - Politique d'audit avancée
+
+    - name: Création GPO - Politique audit avancée
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-AuditPolicy"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
-          $gpo = New-GPO -Name $gpoName -Comment "Politique d'audit avancée - ANSSI"
+          $gpo = New-GPO -Name $gpoName -Comment "Politique audit avancée - ANSSI"
           Write-Output "GPO créée: $gpoName"
-          
-          # Configuration de l'audit via registre GPO
-          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" `
-            -ValueName "SCENoApplyLegacyAuditPolicy" -Type DWord -Value 1
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" -ValueName "SCENoApplyLegacyAuditPolicy" -Type DWord -Value 1
         }
-        
-        # Liaison au domaine
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -LinkEnabled Yes
           Write-Output "GPO liée au domaine"
         }
       register: gpo_audit
-      
+
     - name: Création GPO - Désactivation NTLMv1
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-DisableNTLMv1"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
-          $gpo = New-GPO -Name $gpoName -Comment "Désactivation de NTLMv1 - ANSSI"
-          
-          # Configuration via registre
-          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" `
-            -ValueName "LmCompatibilityLevel" -Type DWord -Value 5
-          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" `
-            -ValueName "NoLMHash" -Type DWord -Value 1
-            
+          $gpo = New-GPO -Name $gpoName -Comment "Désactivation NTLMv1 - ANSSI"
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" -ValueName "LmCompatibilityLevel" -Type DWord -Value 5
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" -ValueName "NoLMHash" -Type DWord -Value 1
           Write-Output "GPO créée: $gpoName"
         }
-        
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -LinkEnabled Yes
         }
       register: gpo_ntlm
-      
+
     - name: Création GPO - Signature SMB obligatoire
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-SMBSigning"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
           $gpo = New-GPO -Name $gpoName -Comment "Signature SMB obligatoire - ANSSI"
-          
-          # Signature côté serveur
-          Set-GPRegistryValue -Name $gpoName `
-            -Key "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" `
-            -ValueName "RequireSecuritySignature" -Type DWord -Value 1
-          Set-GPRegistryValue -Name $gpoName `
-            -Key "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" `
-            -ValueName "EnableSecuritySignature" -Type DWord -Value 1
-            
-          # Signature côté client
-          Set-GPRegistryValue -Name $gpoName `
-            -Key "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters" `
-            -ValueName "RequireSecuritySignature" -Type DWord -Value 1
-          Set-GPRegistryValue -Name $gpoName `
-            -Key "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters" `
-            -ValueName "EnableSecuritySignature" -Type DWord -Value 1
-            
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" -ValueName "RequireSecuritySignature" -Type DWord -Value 1
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Services\LanmanServer\Parameters" -ValueName "EnableSecuritySignature" -Type DWord -Value 1
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters" -ValueName "RequireSecuritySignature" -Type DWord -Value 1
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Services\LanmanWorkstation\Parameters" -ValueName "EnableSecuritySignature" -Type DWord -Value 1
           Write-Output "GPO créée: $gpoName"
         }
-        
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -LinkEnabled Yes
         }
       register: gpo_smb
-      
+
     - name: Création GPO - Protection LSASS
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-LSASSProtection"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
           $gpo = New-GPO -Name $gpoName -Comment "Protection LSASS - ANSSI"
-          
-          # RunAsPPL
-          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" `
-            -ValueName "RunAsPPL" -Type DWord -Value 1
-            
-          # Désactivation WDigest
-          Set-GPRegistryValue -Name $gpoName `
-            -Key "HKLM\System\CurrentControlSet\Control\SecurityProviders\WDigest" `
-            -ValueName "UseLogonCredential" -Type DWord -Value 0
-            
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\Lsa" -ValueName "RunAsPPL" -Type DWord -Value 1
+          Set-GPRegistryValue -Name $gpoName -Key "HKLM\System\CurrentControlSet\Control\SecurityProviders\WDigest" -ValueName "UseLogonCredential" -Type DWord -Value 0
           Write-Output "GPO créée: $gpoName"
         }
-        
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target "{{ domain_dn }}" -LinkEnabled Yes
         }
       register: gpo_lsass
-      
+
     - name: Création GPO - Postes de travail
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-Workstations"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
-          $gpo = New-GPO -Name $gpoName -Comment "Configuration de sécurité des postes de travail"
-          
-          # Désactivation du compte Administrateur local
-          # Configuration via préférences de stratégie locale
-          
+          $gpo = New-GPO -Name $gpoName -Comment "Configuration sécurité postes de travail"
           Write-Output "GPO créée: $gpoName"
         }
-        
         $ouPath = "OU=Postes,{{ domain_dn }}"
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target $ouPath -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target $ouPath -LinkEnabled Yes -ErrorAction SilentlyContinue
-          Write-Output "GPO liée à: $ouPath"
+          Write-Output "GPO liée"
         }
       register: gpo_workstations
       failed_when: false
-      
+
     - name: Création GPO - Serveurs
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
-        
         $gpoName = "SEC-Servers"
         $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
-        
         if (-not $gpo) {
-          $gpo = New-GPO -Name $gpoName -Comment "Configuration de sécurité des serveurs membres"
+          $gpo = New-GPO -Name $gpoName -Comment "Configuration sécurité serveurs membres"
           Write-Output "GPO créée: $gpoName"
         }
-        
         $ouPath = "OU=Serveurs,{{ domain_dn }}"
         $link = Get-GPLink -Guid $gpo.Id.Guid -Target $ouPath -ErrorAction SilentlyContinue
         if (-not $link) {
           New-GPLink -Guid $gpo.Id.Guid -Target $ouPath -LinkEnabled Yes -ErrorAction SilentlyContinue
-          Write-Output "GPO liée à: $ouPath"
+          Write-Output "GPO liée"
         }
       register: gpo_servers
       failed_when: false
-    
+
     - name: Création du Central Store pour les modèles ADMX
       ansible.windows.win_shell: |
         $policyDefPath = "\\{{ ad_domain.name }}\SYSVOL\{{ ad_domain.name }}\Policies\PolicyDefinitions"
-        
         if (-not (Test-Path $policyDefPath)) {
           New-Item -Path $policyDefPath -ItemType Directory -Force
           New-Item -Path "$policyDefPath\en-US" -ItemType Directory -Force
           New-Item -Path "$policyDefPath\fr-FR" -ItemType Directory -Force
-          
-          # Copie des fichiers ADMX depuis le système local
           $localADMX = "C:\Windows\PolicyDefinitions"
           if (Test-Path $localADMX) {
             Copy-Item -Path "$localADMX\*.admx" -Destination $policyDefPath -Force
@@ -269,48 +202,27 @@
               Copy-Item -Path "$localADMX\fr-FR\*.adml" -Destination "$policyDefPath\fr-FR" -Force
             }
           }
-          
-          Write-Output "Central Store créé et peuplé"
+          Write-Output "Central Store créé"
         } else {
           Write-Output "Central Store existant"
         }
       register: central_store
-    
+
     - name: Forçage de la mise à jour des GPOs
-      ansible.windows.win_shell: |
-        gpupdate /force
-        Write-Output "GPOs mises à jour"
+      ansible.windows.win_shell: gpupdate /force
       register: gpupdate
-    
+
     - name: Liste des GPOs créées
       ansible.windows.win_shell: |
         Import-Module GroupPolicy
         Get-GPO -All | Select-Object DisplayName, Id, GpoStatus, CreationTime | ConvertTo-Json
       register: gpo_list
       changed_when: false
-      
+
     - name: Affichage des GPOs
       ansible.builtin.debug:
         msg: "{{ gpo_list.stdout | from_json }}"
-        
+
     - name: Résumé
       ansible.builtin.debug:
-        msg: |
-          ╔════════════════════════════════════════════════════════════════╗
-          ║           GPOs DE SÉCURITÉ CRÉÉES AVEC SUCCÈS                  ║
-          ╠════════════════════════════════════════════════════════════════╣
-          ║ GPOs Tiering ANSSI:                                            ║
-          ║  • SEC-Tier0-Restrictions (lié à OU=Tier0)                     ║
-          ║  • SEC-Tier1-Restrictions (lié à OU=Tier1)                     ║
-          ║  • SEC-Tier2-Restrictions (lié à OU=Tier2)                     ║
-          ║                                                                ║
-          ║ GPOs de sécurité générales:                                    ║
-          ║  • SEC-AuditPolicy (Audit avancé)                              ║
-          ║  • SEC-DisableNTLMv1 (Désactivation NTLMv1)                    ║
-          ║  • SEC-SMBSigning (Signature SMB)                              ║
-          ║  • SEC-LSASSProtection (Protection LSASS)                      ║
-          ║  • SEC-Workstations (Postes de travail)                        ║
-          ║  • SEC-Servers (Serveurs membres)                              ║
-          ║                                                                ║
-          ║ Central Store ADMX: Configuré                                  ║
-          ╚════════════════════════════════════════════════════════════════╝
+        msg: "GPOs de sécurité créées avec succès"
