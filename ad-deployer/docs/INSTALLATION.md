@@ -359,13 +359,7 @@ Get-EventLog -LogName "Directory Service" -Newest 50
 Install-ADDSForest -DomainName lab.local -Force
 ```
 
-## 📚 Prochaines étapes
 
-1. ✅ Domaine déployé
-2. → Configurer la sauvegarde AD
-3. → Implémenter PAW (Privileged Access Workstations)
-4. → Former les administrateurs au modèle Tiering
-5. → Déployer les outils de monitoring (Zabbix, ELK)
 
 ---
 
