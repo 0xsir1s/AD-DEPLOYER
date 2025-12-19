@@ -7,13 +7,13 @@
 - name: Création des utilisateurs Active Directory
   hosts: domain_controllers
   gather_facts: no
-  
+
   vars:
     domain_dn: "DC={{ ad_domain.name.split('.')[0] }},DC={{ ad_domain.name.split('.')[1] }}"
     domain_name: "{{ ad_domain.name }}"
-    
+
   tasks:
-    
+
     - name: Création du compte Admin Tier 0
       microsoft.ad.user:
         name: "adm-t0-{{ ad_domain.netbios | lower }}"
@@ -33,7 +33,7 @@
         attributes:
           set:
             adminDescription: "Compte Tier 0 - Accès DC uniquement"
-            
+
     - name: Création du compte Admin Tier 1
       microsoft.ad.user:
         name: "adm-t1-{{ ad_domain.netbios | lower }}"
@@ -51,7 +51,7 @@
         attributes:
           set:
             adminDescription: "Compte Tier 1 - Serveurs uniquement"
-            
+
     - name: Création du compte Admin Tier 2
       microsoft.ad.user:
         name: "adm-t2-{{ ad_domain.netbios | lower }}"
@@ -69,7 +69,7 @@
         attributes:
           set:
             adminDescription: "Compte Tier 2 - Postes uniquement"
-    
+
     - name: Création des utilisateurs définis dans les variables
       microsoft.ad.user:
         name: "{{ item.username }}"
@@ -89,7 +89,7 @@
       loop: "{{ ad_users | default([]) }}"
       when: ad_users is defined and ad_users | length > 0
       register: users_created
-    
+
     - name: Création d'utilisateurs de démonstration
       microsoft.ad.user:
         name: "{{ item.username }}"
@@ -108,7 +108,6 @@
         groups:
           add:
             - "Domain Users"
-            - "GRP-{{ item.department }}"
       loop:
         - username: "j.dupont"
           firstname: "Jean"
@@ -138,13 +137,11 @@
       when: (ad_users is not defined) or (ad_users | length == 0)
       register: demo_users_created
       failed_when: false
-    
+
     - name: Création de la clé racine KDS pour gMSA
       ansible.windows.win_shell: |
         $kdsKey = Get-KdsRootKey
         if (-not $kdsKey) {
-          # En environnement de test, utiliser -EffectiveImmediately
-          # En production, retirer -EffectiveTime pour attendre 10h
           Add-KdsRootKey -EffectiveTime ((Get-Date).AddHours(-10))
           Write-Output "Clé KDS créée"
         } else {
@@ -152,7 +149,7 @@
         }
       register: kds_key
       changed_when: "'Clé KDS créée' in kds_key.stdout"
-      
+
     - name: Création d'un groupe pour les gMSA
       microsoft.ad.group:
         name: "GRP-gMSA-Authorized"
@@ -161,12 +158,11 @@
         path: "OU=Comptes-Service,{{ domain_dn }}"
         description: "Serveurs autorisés à utiliser les gMSA"
         state: present
-    
-    - name: Configuration de l'attribut 'Protected Users' pour les admins
+
+    - name: Configuration Protected Users pour admin Tier 0
       ansible.windows.win_shell: |
         $protectedUsers = Get-ADGroup "Protected Users"
         $tier0Admin = Get-ADUser "adm-t0-{{ ad_domain.netbios | lower }}" -ErrorAction SilentlyContinue
-        
         if ($tier0Admin) {
           Add-ADGroupMember -Identity $protectedUsers -Members $tier0Admin -ErrorAction SilentlyContinue
           Write-Output "Admin T0 ajouté au groupe Protected Users"
@@ -174,56 +170,21 @@
       register: protected_users
       changed_when: "'ajouté' in protected_users.stdout"
       failed_when: false
-    
+
     - name: Comptage des utilisateurs créés
       ansible.windows.win_shell: |
         @{
           TotalUsers = (Get-ADUser -Filter * | Measure-Object).Count
           EnabledUsers = (Get-ADUser -Filter 'Enabled -eq $true' | Measure-Object).Count
           DisabledUsers = (Get-ADUser -Filter 'Enabled -eq $false' | Measure-Object).Count
-          AdminUsers = (Get-ADUser -Filter * -SearchBase "OU=Admin,{{ domain_dn }}" | Measure-Object).Count
-          StandardUsers = (Get-ADUser -Filter * -SearchBase "OU=Utilisateurs,{{ domain_dn }}" -ErrorAction SilentlyContinue | Measure-Object).Count
         } | ConvertTo-Json
       register: user_stats
       changed_when: false
-      
+
     - name: Affichage des statistiques utilisateurs
       ansible.builtin.debug:
         msg: "{{ user_stats.stdout | from_json }}"
-        
-    - name: Liste des utilisateurs par OU
-      ansible.windows.win_shell: |
-        $ous = @(
-          "OU=Tier0,OU=Admin,{{ domain_dn }}",
-          "OU=Tier1,OU=Admin,{{ domain_dn }}",
-          "OU=Tier2,OU=Admin,{{ domain_dn }}",
-          "OU=Utilisateurs,{{ domain_dn }}"
-        )
-        
-        $result = @{}
-        foreach ($ou in $ous) {
-          try {
-            $users = Get-ADUser -Filter * -SearchBase $ou -SearchScope Subtree | Select-Object Name
-            $result[$ou] = $users.Name
-          } catch {
-            $result[$ou] = @()
-          }
-        }
-        $result | ConvertTo-Json
-      register: users_by_ou
-      changed_when: false
-      
+
     - name: Résumé
       ansible.builtin.debug:
-        msg: |
-          ╔════════════════════════════════════════════════════════════════╗
-          ║            UTILISATEURS CRÉÉS AVEC SUCCÈS                      ║
-          ╠════════════════════════════════════════════════════════════════╣
-          ║ Comptes administrateurs Tiering:                               ║
-          ║  • adm-t0-{{ ad_domain.netbios | lower }}: Admin Tier 0 (DC/AD)
-          ║  • adm-t1-{{ ad_domain.netbios | lower }}: Admin Tier 1 (Serveurs)
-          ║  • adm-t2-{{ ad_domain.netbios | lower }}: Admin Tier 2 (Postes)
-          ║                                                                ║
-          ║ Le compte Tier 0 est membre du groupe 'Protected Users'        ║
-          ║ pour une sécurité renforcée (recommandation ANSSI).            ║
-          ╚════════════════════════════════════════════════════════════════╝
+        msg: "Utilisateurs créés avec succès"
