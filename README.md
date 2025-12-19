@@ -143,16 +143,8 @@ MIT License - voir fichier [LICENSE](LICENSE)
 
 ## ✍️ Auteur
 
-**0xsir1s** - Étudiant cybersécurité IPSSI Nice
+**0xsir1s** - 
 - GitHub : [@0xsir1s](https://github.com/0xsir1s)
-- LinkedIn : [Profil LinkedIn]
-- Portfolio : [En cours]
-
-## 🙏 Remerciements
-
-- ANSSI pour les recommandations de sécurité
-- Communauté Ansible
-- IPSSI Nice
 
 ---
 
