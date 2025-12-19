@@ -199,22 +199,6 @@ New-NetFirewallRule -Name "WinRM-HTTP" -DisplayName "WinRM HTTP" -Protocol TCP -
 
 ---
 
-## Niveaux de durcissement
-
-| Mesure | `minimal` | `standard` | `anssi` | `paranoid` |
-|--------|:---------:|:----------:|:-------:|:----------:|
-| **MDP minimum** | 8 | 12 | 14 | 16 |
-| **Historique MDP** | 5 | 12 | 24 | 24 |
-| **Verrouillage (tentatives)** | 10 | 5 | 5 | 3 |
-| **Forcer NTLMv2** | ❌ | ✅ | ✅ | ✅ |
-| **Signature SMB** | ❌ | ✅ | ✅ | ✅ |
-| **Protection LSASS** | ❌ | ✅ | ✅ | ✅ |
-| **Signature LDAP** | ❌ | ✅ | ✅ | ✅ |
-
-> **Recommandation :** Utilisez `anssi` pour la production, `minimal` uniquement pour les labs.
-
----
-
 ## Structure du projet
 
 ```
