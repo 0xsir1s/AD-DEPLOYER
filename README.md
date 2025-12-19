@@ -267,49 +267,6 @@ Les logs sont générés dans `logs/` avec horodatage :
 logs/deploy-ad_2024-12-19_14-30-25.log
 ```
 
----
-
-## Dépannage
-
-### Erreur "WinRM non accessible"
-
-```bash
-# Vérifier la connectivité
-nc -zv 192.168.1.10 5985
-
-# Sur Windows, réactiver WinRM
-winrm quickconfig -force
-```
-
-### Erreur "Credentials rejected" après promotion DC
-
-Après la promotion en DC, le compte local n'existe plus. Utilisez le compte domaine :
-
-```bash
-./deploy-ad.sh -t 192.168.1.10 -p 'DsrmP@ss!' -s 'DsrmP@ss!' \
-  -d corp.local -n CORP -a 'CORP\Administrator'
-```
-
-### Erreur "Collection Ansible manquante"
-
-```bash
-ansible-galaxy collection install microsoft.ad community.windows ansible.windows --force
-```
-
-### Erreur "Directory object not found"
-
-Les OUs n'existent pas encore. Relancez le script, il exécutera les playbooks dans l'ordre.
-
-### Erreur YAML parsing
-
-Vérifiez qu'il n'y a pas de guillemets manquants dans les playbooks :
-
-```bash
-ansible-playbook --syntax-check ansible/playbooks/*.yml
-```
-
----
-
 ## Environnements testés
 
 | OS | Hyperviseur | Statut |
