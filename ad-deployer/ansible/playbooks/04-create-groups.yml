@@ -7,12 +7,12 @@
 - name: Création des groupes de sécurité
   hosts: domain_controllers
   gather_facts: no
-  
+
   vars:
     domain_dn: "DC={{ ad_domain.name.split('.')[0] }},DC={{ ad_domain.name.split('.')[1] }}"
-    
+
   tasks:
-    
+
     - name: Création des groupes Tier 0
       microsoft.ad.group:
         name: "{{ item.name }}"
@@ -31,7 +31,7 @@
           description: "Comptes de service Tier 0"
         - name: "T0-PAW-Users"
           description: "Utilisateurs autorisés sur PAW Tier 0"
-          
+
     - name: Création des groupes Tier 1
       microsoft.ad.group:
         name: "{{ item.name }}"
@@ -50,7 +50,7 @@
           description: "Comptes de service Tier 1"
         - name: "T1-ServerAdmins"
           description: "Administrateurs locaux des serveurs"
-          
+
     - name: Création des groupes Tier 2
       microsoft.ad.group:
         name: "{{ item.name }}"
@@ -69,7 +69,7 @@
           description: "Comptes de service Tier 2"
         - name: "T2-WorkstationAdmins"
           description: "Administrateurs locaux des postes"
-    
+
     - name: Création des groupes de délégation
       microsoft.ad.group:
         name: "{{ item.name }}"
@@ -93,7 +93,7 @@
           description: "Délégation: Jonction de machines au domaine"
         - name: "DLG-GPO-Edit"
           description: "Délégation: Édition des GPO"
-    
+
     - name: Création des groupes métier personnalisés
       microsoft.ad.group:
         name: "GRP-{{ item.name }}"
@@ -105,7 +105,6 @@
       loop: "{{ ad_groups | default([]) }}"
       when: ad_groups is defined and ad_groups | length > 0
 
-    
     - name: Création des groupes fonctionnels
       microsoft.ad.group:
         name: "{{ item.name }}"
@@ -127,7 +126,7 @@
           description: "Utilisateurs impression couleur"
         - name: "GRP-USB-Allowed"
           description: "Utilisateurs autorisés USB"
-    
+
     - name: Création des groupes de ressources
       microsoft.ad.group:
         name: "{{ item.name }}"
@@ -149,67 +148,21 @@
           description: "Accès lecture au partage Direction"
         - name: "RES-Share-Direction-RW"
           description: "Accès écriture au partage Direction"
-    
-    - name: Récupération du SID AdminSDHolder
-      ansible.windows.win_shell: |
-        $admins = @(
-          "Domain Admins",
-          "Enterprise Admins", 
-          "Schema Admins",
-          "Administrators",
-          "Account Operators",
-          "Backup Operators",
-          "Print Operators",
-          "Server Operators",
-          "Cert Publishers"
-        )
-        
-        $result = @()
-        foreach ($group in $admins) {
-          try {
-            $g = Get-ADGroup -Identity $group -Properties adminCount
-            $result += @{
-              Name = $g.Name
-              AdminCount = $g.adminCount
-              Protected = ($g.adminCount -eq 1)
-            }
-          } catch {
-            # Groupe n'existe pas, ignorer
-          }
-        }
-        $result | ConvertTo-Json
-      register: protected_groups
-      changed_when: false
-    
+
     - name: Comptage des groupes créés
       ansible.windows.win_shell: |
         @{
           TotalGroups = (Get-ADGroup -Filter * | Measure-Object).Count
           SecurityGroups = (Get-ADGroup -Filter 'GroupCategory -eq "Security"' | Measure-Object).Count
           DistributionGroups = (Get-ADGroup -Filter 'GroupCategory -eq "Distribution"' | Measure-Object).Count
-          GlobalGroups = (Get-ADGroup -Filter 'GroupScope -eq "Global"' | Measure-Object).Count
-          DomainLocalGroups = (Get-ADGroup -Filter 'GroupScope -eq "DomainLocal"' | Measure-Object).Count
-          UniversalGroups = (Get-ADGroup -Filter 'GroupScope -eq "Universal"' | Measure-Object).Count
         } | ConvertTo-Json
       register: group_stats
       changed_when: false
-      
+
     - name: Affichage des statistiques
       ansible.builtin.debug:
         msg: "{{ group_stats.stdout | from_json }}"
-        
+
     - name: Résumé
       ansible.builtin.debug:
-        msg: |
-          ╔════════════════════════════════════════════════════════════════╗
-          ║          GROUPES DE SÉCURITÉ CRÉÉS AVEC SUCCÈS                 ║
-          ╠════════════════════════════════════════════════════════════════╣
-          ║ Groupes Tiering ANSSI:                                         ║
-          ║  • Tier 0: T0-Admins, T0-Operators, T0-PAW-Users               ║
-          ║  • Tier 1: T1-Admins, T1-Operators, T1-ServerAdmins            ║
-          ║  • Tier 2: T2-Admins, T2-Helpdesk, T2-WorkstationAdmins        ║
-          ║                                                                ║
-          ║ Groupes de délégation: DLG-*                                   ║
-          ║ Groupes fonctionnels: GRP-*                                    ║
-          ║ Groupes de ressources: RES-*                                   ║
-          ╚════════════════════════════════════════════════════════════════╝
+        msg: "Groupes de sécurité créés avec succès selon le modèle Tiering ANSSI"
