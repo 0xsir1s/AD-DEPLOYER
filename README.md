@@ -256,13 +256,3 @@ logs/deploy-ad_2024-12-19_14-30-25.log
 | Windows Server 2022 | Vagrant/VMware |
 | Windows Server 2019 | Hyper-V |
 | Windows Server 2019 | VirtualBox |
-
----
-
-## Licence
-
-Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
-
----
-
-⭐ **Si ce projet t'a été utile, n'hésite pas à lui donner une étoile !**
