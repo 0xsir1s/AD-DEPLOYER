@@ -1,0 +1,79 @@
+---
+# =============================================================================
+# Playbook: 02-forest.yml
+# Description: Create New Active Directory Forest
+# Tags: forest, domain
+# =============================================================================
+
+- name: "[FOREST] - Provision Active Directory Domain"
+  hosts: domain_controllers
+  gather_facts: yes
+  tags: [forest, domain, dc]
+
+  vars:
+    domain_name: "{{ ad_domain.name }}"
+    netbios_name: "{{ ad_domain.netbios }}"
+    safe_mode_pwd: "{{ ad_domain.safe_mode_password }}"
+
+  tasks:
+
+    - name: "[FOREST] - Check if Domain Exists"
+      ansible.windows.win_service:
+        name: NTDS
+      register: ntds_service
+      ignore_errors: yes
+
+    - name: "[FOREST] - Create New AD Forest"
+      microsoft.ad.domain:
+        dns_domain_name: "{{ domain_name }}"
+        domain_netbios_name: "{{ netbios_name }}"
+        forest_mode: "{{ ad_domain.forest_mode | default('WinThreshold') }}"
+        domain_mode: "{{ ad_domain.domain_mode | default('WinThreshold') }}"
+        safe_mode_password: "{{ safe_mode_pwd }}"
+        install_dns: yes
+        reboot: yes
+      register: ad_promotion
+      when: ntds_service.state is not defined
+      tags: [promote]
+
+    - name: "[FOREST] - Wait for WinRM after Reboot"
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 5985
+        state: started
+        delay: 30
+        timeout: 300
+      delegate_to: localhost
+      when: ad_promotion.reboot_required | default(false)
+
+    - name: "[FOREST] - Configure DNS Forwarders"
+      ansible.windows.win_dns_server_ups:
+        forwarders:
+          - 8.8.8.8
+          - 8.8.4.4
+      tags: [dns]
+
+    - name: "[FOREST] - Create Reverse DNS Zone"
+      ansible.windows.win_shell: |
+        $Network = "{{ ansible_host }}".Substring(0, "{{ ansible_host }}".LastIndexOf('.')) + ".x"
+        $ZoneName = "{{ ansible_host }}".Split('.')[2] + "." + "{{ ansible_host }}".Split('.')[1] + "." + "{{ ansible_host }}".Split('.')[0] + ".in-addr.arpa"
+        if (-not (Get-DnsServerZone -Name $ZoneName -ErrorAction SilentlyContinue)) {
+            Add-DnsServerPrimaryZone -NetworkId $Network -ReplicationScope Forest
+        }
+      tags: [dns]
+
+    - name: "[FOREST] - Enable AD Recycle Bin"
+      microsoft.ad.domain:
+        dns_domain_name: "{{ domain_name }}"
+        domain_mode: "{{ ad_domain.domain_mode | default('WinThreshold') }}"
+      tags: [features]
+
+    - name: "[FOREST] - Rename Default Site"
+      ansible.windows.win_shell: |
+        Get-ADReplicationSite -Filter * | Where-Object { $_.Name -eq "Default-First-Site-Name" } | Rename-ADReplicationSite -NewName "HQ-DataCenter"
+      ignore_errors: yes
+      tags: [sites]
+
+    - name: "[FOREST] - Summary"
+      ansible.builtin.debug:
+        msg: "Forest {{ domain_name }} created successfully."

@@ -1,0 +1,140 @@
+---
+# =============================================================================
+# Playbook: 04-access.yml
+# Description: Create Security Groups according to ANSSI Tiering Model
+# Tags: access, groups, security
+# =============================================================================
+
+- name: "[ACCESS] - Deploy Security Groups"
+  hosts: domain_controllers
+  gather_facts: no
+  tags: [access, groups]
+
+  vars:
+    domain_dn: "DC={{ ad_domain.name.split('.')[0] }},DC={{ ad_domain.name.split('.')[1] }}"
+
+  tasks:
+
+    - name: "[ACCESS] - Create Tier 0 Groups"
+      microsoft.ad.group:
+        name: "{{ item.name }}"
+        scope: global
+        category: security
+        path: "OU=Groups,OU=Tier0,OU=Admin,{{ domain_dn }}"
+        description: "{{ item.description }}"
+        state: present
+        protect_from_deletion: true
+      loop:
+        - name: "T0-Admins"
+          description: "Tier 0 Admins - DC & AD Access Only"
+        - name: "T0-Operators"
+          description: "Tier 0 Operators - Limited DC Operations"
+        - name: "T0-ServiceAccounts"
+          description: "Tier 0 Service Accounts"
+        - name: "T0-PAW-Users"
+          description: "Tier 0 PAW Authorized Users"
+      tags: [tier0]
+
+    - name: "[ACCESS] - Create Tier 1 Groups"
+      microsoft.ad.group:
+        name: "{{ item.name }}"
+        scope: global
+        category: security
+        path: "OU=Groups,OU=Tier1,OU=Admin,{{ domain_dn }}"
+        description: "{{ item.description }}"
+        state: present
+        protect_from_deletion: true
+      loop:
+        - name: "T1-Admins"
+          description: "Tier 1 Admins - Member Servers Access"
+        - name: "T1-Operators"
+          description: "Tier 1 Operators - Limited Server Operations"
+        - name: "T1-ServiceAccounts"
+          description: "Tier 1 Service Accounts"
+        - name: "T1-ServerAdmins"
+          description: "Local Administrators for Servers"
+      tags: [tier1]
+
+    - name: "[ACCESS] - Create Tier 2 Groups"
+      microsoft.ad.group:
+        name: "{{ item.name }}"
+        scope: global
+        category: security
+        path: "OU=Groups,OU=Tier2,OU=Admin,{{ domain_dn }}"
+        description: "{{ item.description }}"
+        state: present
+        protect_from_deletion: true
+      loop:
+        - name: "T2-Admins"
+          description: "Tier 2 Admins - Workstations Access"
+        - name: "T2-Helpdesk"
+          description: "Tier 2 Helpdesk - User Support"
+        - name: "T2-ServiceAccounts"
+          description: "Tier 2 Service Accounts"
+        - name: "T2-WorkstationAdmins"
+          description: "Local Administrators for Workstations"
+      tags: [tier2]
+
+    - name: "[ACCESS] - Create Delegation Groups"
+      microsoft.ad.group:
+        name: "{{ item.name }}"
+        scope: domainlocal
+        category: security
+        path: "OU=Groups,{{ domain_dn }}"
+        description: "{{ item.description }}"
+        state: present
+      loop:
+        - name: "DLG-Users-Create"
+          description: "Delegation: Create User Accounts"
+        - name: "DLG-Users-Modify"
+          description: "Delegation: Modify User Accounts"
+        - name: "DLG-Users-Delete"
+          description: "Delegation: Delete User Accounts"
+        - name: "DLG-Users-ResetPwd"
+          description: "Delegation: Reset Passwords"
+        - name: "DLG-Groups-Manage"
+          description: "Delegation: Manage Groups"
+        - name: "DLG-Computers-Join"
+          description: "Delegation: Join Computers to Domain"
+        - name: "DLG-GPO-Edit"
+          description: "Delegation: Edit GPOs"
+      tags: [delegation]
+
+    - name: "[ACCESS] - Create Business Groups"
+      microsoft.ad.group:
+        name: "GRP-{{ item.name }}"
+        scope: "{{ item.scope | default('global') }}"
+        category: "{{ item.category | default('security') }}"
+        path: "OU=Groups,{{ domain_dn }}"
+        description: "Business Group: {{ item.name }}"
+        state: present
+      loop: "{{ ad_groups | default([]) }}"
+      when: ad_groups is defined and ad_groups | length > 0
+      tags: [business]
+
+    - name: "[ACCESS] - Create Functional Groups"
+      microsoft.ad.group:
+        name: "{{ item.name }}"
+        scope: global
+        category: security
+        path: "OU=Groups,{{ domain_dn }}"
+        description: "{{ item.description }}"
+        state: present
+      loop:
+        - name: "GRP-VPN-Users"
+          description: "VPN Authorized Users"
+        - name: "GRP-Remote-Desktop"
+          description: "RDP Authorized Users"
+        - name: "GRP-Wifi-Corporate"
+          description: "Corporate WiFi Users"
+        - name: "GRP-SharePoint-Users"
+          description: "SharePoint Users"
+        - name: "GRP-Print-Color"
+          description: "Color Printing Users"
+        - name: "GRP-USB-Allowed"
+          description: "USB Allowed Users"
+      tags: [functional]
+
+    - name: "[ACCESS] - Summary"
+      ansible.builtin.debug:
+        msg: "Security Groups created successfully."

@@ -1,0 +1,73 @@
+---
+# =============================================================================
+# Playbook: 01-bootstrap.yml
+# Description: Install Prerequisites and Roles
+# Tags: bootstrap, install
+# =============================================================================
+
+- name: "[BOOTSTRAP] - Prepare System for AD Deployment"
+  hosts: domain_controllers
+  gather_facts: yes
+  tags: [bootstrap, install]
+
+  tasks:
+
+    - name: "[BOOTSTRAP] - Disable Firewall (Temporary)"
+      ansible.windows.win_firewall:
+        state: disabled
+        profiles:
+          - Domain
+          - Private
+          - Public
+      tags: [firewall]
+
+    - name: "[BOOTSTRAP] - Set Static IP (If Needed)"
+      ansible.builtin.debug:
+        msg: "Assuming IP {{ ansible_host }} is already static."
+
+    - name: "[BOOTSTRAP] - Install AD-Domain-Services Role"
+      ansible.windows.win_feature:
+        name: AD-Domain-Services
+        state: present
+        include_management_tools: yes
+      register: ad_feature
+      tags: [roles, ad]
+
+    - name: "[BOOTSTRAP] - Install DNS Role"
+      ansible.windows.win_feature:
+        name: DNS
+        state: present
+        include_management_tools: yes
+      tags: [roles, dns]
+
+    - name: "[BOOTSTRAP] - Install RSAT Tools"
+      ansible.windows.win_feature:
+        name: RSAT
+        state: present
+        include_management_tools: yes
+      tags: [roles, rsat]
+
+    - name: "[BOOTSTRAP] - Set DNS Client to Localhost"
+      ansible.windows.win_dns_client:
+        adapter_names: '*'
+        dns_servers:
+          - 127.0.0.1
+      tags: [dns]
+
+    - name: "[BOOTSTRAP] - Install NuGet Provider"
+      ansible.windows.win_shell: |
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+      register: nuget_install
+      changed_when: "'Installing' in nuget_install.stdout"
+      ignore_errors: yes
+      tags: [powershell, modules]
+
+    - name: "[BOOTSTRAP] - Trust PSGallery"
+      ansible.windows.win_shell: |
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+      ignore_errors: yes
+      tags: [powershell, modules]
+
+    - name: "[BOOTSTRAP] - Summary"
+      ansible.builtin.debug:
+        msg: "System bootstrap complete. Ready for forest creation."
