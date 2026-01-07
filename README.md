@@ -127,7 +127,7 @@ AD-DEPLOYER/
 
 ## Author
 
-**0xsir1s** (DISIZ)
+**0xsir1s**
 *   *Cybersecurity Student & Infrastructure Enthusiast*
 *   [GitHub](https://github.com/DISIZ)
 
